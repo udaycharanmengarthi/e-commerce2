@@ -1,3 +1,5 @@
+import { UserProfile } from '../lib/supabase';
+
 export interface Product {
   id: string;
   name: string;
@@ -18,9 +20,7 @@ export interface CartItem {
   quantity: number;
 }
 
-export interface User {
-  id: string;
-  name: string;
+export interface User extends UserProfile {
   email: string;
 }
 

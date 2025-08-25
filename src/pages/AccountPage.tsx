@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCheckout, Address, PaymentMethod } from '../context/CheckoutContext';
+import { supabase } from '../lib/supabase';
 import Button from '../components/ui/Button';
 import { User, Package, CreditCard, LogOut, MapPin, Trash2, Plus } from 'lucide-react';
 
@@ -11,6 +12,12 @@ const AccountPage: React.FC = () => {
   const { addresses, paymentMethods } = useCheckout();
   
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'addresses' | 'payments'>('profile');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: user?.name || '',
+    phone: user?.phone || ''
+  });
+  const [updateLoading, setUpdateLoading] = useState(false);
   
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -18,6 +25,12 @@ const AccountPage: React.FC = () => {
       navigate('/login?redirect=account');
     }
   }, [isAuthenticated, navigate]);
+  
+  React.useEffect(() => {
+    if (user) {
+      setEditForm({ name: user.name, phone: user.phone || '' });
+    }
+  }, [user]);
   
   if (!user) {
     return (
@@ -44,6 +57,37 @@ const AccountPage: React.FC = () => {
     { id: 'addresses', label: 'Addresses', icon: <MapPin size={18} /> },
     { id: 'payments', label: 'Payment Methods', icon: <CreditCard size={18} /> }
   ];
+  
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUpdateLoading(true);
+    
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          name: editForm.name,
+          phone: editForm.phone || null
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local user state
+      // Note: In a real app, you might want to refetch the user data
+      setIsEditing(false);
+      
+      // Reload the page to get updated user data
+      window.location.reload();
+    } catch (err) {
+      console.error('Error updating profile:', err);
+      alert('Failed to update profile. Please try again.');
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
   
   return (
     <div className="container mx-auto px-4 py-8">
@@ -97,47 +141,119 @@ const AccountPage: React.FC = () => {
             {activeTab === 'profile' && (
               <div>
                 <h2 className="text-xl font-semibold mb-6">Profile Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      value={user.name}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email Address
-                    </label>
-                    <input
-                      type="email"
-                      value={user.email}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Phone Number
-                    </label>
-                    <input
-                      type="tel"
-                      value={user.phone || 'Not provided'}
-                      readOnly
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
-                    />
-                  </div>
-                </div>
                 
-                <div className="mt-8">
-                  <Button variant="primary">Edit Profile</Button>
-                </div>
+                {!isEditing ? (
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={user.name}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={user.email}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={user.phone || 'Not provided'}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="mt-8">
+                      <Button variant="primary" onClick={() => setIsEditing(true)}>
+                        Edit Profile
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <form onSubmit={handleProfileUpdate}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                          required
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={user.email}
+                          readOnly
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={editForm.phone}
+                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                          placeholder="Enter phone number"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="mt-8 flex space-x-3">
+                      <Button 
+                        type="submit" 
+                        variant="primary"
+                        isLoading={updateLoading}
+                        disabled={updateLoading}
+                      >
+                        Save Changes
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="outline"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditForm({ name: user.name, phone: user.phone || '' });
+                        }}
+                        disabled={updateLoading}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
             

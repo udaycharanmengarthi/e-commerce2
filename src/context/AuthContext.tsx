@@ -1,11 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase, UserProfile } from '../lib/supabase';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
-interface User {
-  id: string;
-  name: string;
+interface User extends UserProfile {
   email: string;
-  phone?: string;
 }
 
 interface AuthContextType {
@@ -26,47 +25,89 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
-  // Check if user is already logged in
+  // Check authentication state and load user profile
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
+    const getSession = async () => {
       try {
-        setUser(JSON.parse(storedUser));
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          await loadUserProfile(session.user);
+        }
       } catch (err) {
-        console.error('Error parsing user from localStorage:', err);
-        localStorage.removeItem('user');
+        console.error('Error in getSession:', err);
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+
+    getSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        await loadUserProfile(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  const loadUserProfile = async (supabaseUser: SupabaseUser) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', supabaseUser.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading user profile:', error);
+        return;
+      }
+
+      if (profile) {
+        setUser({
+          ...profile,
+          email: supabaseUser.email || ''
+        });
+      }
+    } catch (err) {
+      console.error('Error in loadUserProfile:', err);
+    }
+  };
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setLoading(true);
     setError(null);
     
     try {
-      // In a real app, you would make an API call here
-      // For demo purposes, we'll simulate a successful login if email contains '@'
-      if (!email.includes('@')) {
-        throw new Error('Invalid email format');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        throw error;
       }
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Mock user data
-      const loggedInUser: User = {
-        id: '123456',
-        name: email.split('@')[0],
-        email: email
-      };
-      
-      setUser(loggedInUser);
-      localStorage.setItem('user', JSON.stringify(loggedInUser));
+
+      if (data.user) {
+        await loadUserProfile(data.user);
+      }
+
       setLoading(false);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during login');
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during login';
+      setError(errorMessage);
       setLoading(false);
       return false;
     }
@@ -82,38 +123,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      // In a real app, you would make an API call here
-      // For demo purposes, we'll simulate a successful registration
-      if (!email.includes('@')) {
-        throw new Error('Invalid email format');
-      }
-      
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data
-      const newUser: User = {
-        id: Math.random().toString(36).substring(2, 15),
-        name,
+      const { data, error } = await supabase.auth.signUp({
         email,
-        phone
-      };
-      
-      setUser(newUser);
-      localStorage.setItem('user', JSON.stringify(newUser));
+        password,
+        options: {
+          data: {
+            name,
+            phone
+          }
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        // User profile will be created automatically by the database trigger
+        await loadUserProfile(data.user);
+      }
+
       setLoading(false);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred during registration');
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during registration';
+      setError(errorMessage);
       setLoading(false);
       return false;
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    navigate('/login');
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      navigate('/login');
+    } catch (err) {
+      console.error('Error during logout:', err);
+    }
   };
 
   return (
