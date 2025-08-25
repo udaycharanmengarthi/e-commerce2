@@ -22,6 +22,7 @@ export interface CartItem {
 
 export interface User extends UserProfile {
   email: string;
+}
 
 export interface WishlistItem {
   productId: string;
