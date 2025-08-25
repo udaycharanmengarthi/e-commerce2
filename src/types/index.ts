@@ -1,8 +1,8 @@
 import { UserProfile } from '../lib/supabase';
 
-export interface Product {
-  id: string;
-  name: string;
+import { UserProfile } from '../lib/supabase';
+
+export interface User extends UserProfile {
   description: string;
   price: number;
   discountPrice?: number;
@@ -22,7 +22,6 @@ export interface CartItem {
 
 export interface User extends UserProfile {
   email: string;
-}
 
 export interface WishlistItem {
   productId: string;

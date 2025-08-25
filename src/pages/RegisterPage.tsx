@@ -47,16 +47,12 @@ const RegisterPage: React.FC = () => {
   }, [isAuthenticated, navigate, redirectPath]);
   
   const onSubmit = async (data: RegisterFormData) => {
-    const success = await registerUser(
+    await registerUser(
       data.name,
       data.email,
       data.password,
       data.phone
     );
-    
-    if (success) {
-      navigate(redirectPath);
-    }
   };
 
   return (

@@ -40,10 +40,7 @@ const LoginPage: React.FC = () => {
   }, [isAuthenticated, navigate, redirectPath]);
   
   const onSubmit = async (data: LoginFormData) => {
-    const success = await login(data.email, data.password);
-    if (success) {
-      navigate(redirectPath);
-    }
+    await login(data.email, data.password);
   };
 
   return (

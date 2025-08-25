@@ -81,7 +81,20 @@ const AccountPage: React.FC = () => {
       
       // Reload the page to get updated user data
       window.location.reload();
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local user state
+      // Note: In a real app, you might want to refetch the user data
+      setIsEditing(false);
+      
+      // Reload the page to get updated user data
+      window.location.reload();
     } catch (err) {
+      console.error('Error updating profile:', err);
+      alert('Failed to update profile. Please try again.');
       console.error('Error updating profile:', err);
       alert('Failed to update profile. Please try again.');
     } finally {
